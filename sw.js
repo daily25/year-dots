@@ -1,13 +1,14 @@
 // Year Dots Service Worker
-const CACHE_NAME = 'year-dots-v1';
+const CACHE_NAME = 'year-dots-v2';
+const BASE_PATH = self.location.pathname.replace(/sw\.js$/, '');
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/index.css',
-    '/app.js',
-    '/manifest.json',
-    '/icons/icon-192.png',
-    '/icons/icon-512.png'
+    BASE_PATH,
+    BASE_PATH + 'index.html',
+    BASE_PATH + 'index.css',
+    BASE_PATH + 'app.js',
+    BASE_PATH + 'manifest.json',
+    BASE_PATH + 'icons/icon-192.png',
+    BASE_PATH + 'icons/icon-512.png'
 ];
 
 // Install event - cache assets
@@ -65,7 +66,7 @@ self.addEventListener('fetch', (event) => {
             })
             .catch(() => {
                 // Offline fallback
-                return caches.match('/index.html');
+                return caches.match(BASE_PATH + 'index.html');
             })
     );
 });
