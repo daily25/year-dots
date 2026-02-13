@@ -1,5 +1,5 @@
 // Year Dots Service Worker
-const CACHE_NAME = 'year-dots-v2';
+const CACHE_NAME = 'year-dots-v3';
 const BASE_PATH = self.location.pathname.replace(/sw\.js$/, '');
 const urlsToCache = [
     BASE_PATH,
@@ -16,7 +16,6 @@ self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
-                console.log('Opened cache');
                 return cache.addAll(urlsToCache);
             })
             .catch((err) => {
@@ -42,31 +41,23 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// Fetch event - serve from cache, fall back to network
+// Fetch event - network first, fall back to cache
 self.addEventListener('fetch', (event) => {
     event.respondWith(
-        caches.match(event.request)
+        fetch(event.request)
             .then((response) => {
-                // Return cached version or fetch from network
-                if (response) {
-                    return response;
-                }
-                return fetch(event.request).then((response) => {
-                    // Don't cache non-successful responses or non-GET requests
-                    if (!response || response.status !== 200 || event.request.method !== 'GET') {
-                        return response;
-                    }
-                    // Clone and cache the response
+                if (response && response.status === 200 && event.request.method === 'GET') {
                     const responseToCache = response.clone();
                     caches.open(CACHE_NAME).then((cache) => {
                         cache.put(event.request, responseToCache);
                     });
-                    return response;
-                });
+                }
+                return response;
             })
             .catch(() => {
-                // Offline fallback
-                return caches.match(BASE_PATH + 'index.html');
+                return caches.match(event.request).then((response) => {
+                    return response || caches.match(BASE_PATH + 'index.html');
+                });
             })
     );
 });

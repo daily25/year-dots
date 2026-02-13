@@ -1,4 +1,4 @@
-// Digital clock digit patterns (5 wide × 9 tall, 7-segment style)
+// Digital clock digit patterns (5 wide x 9 tall, 7-segment style)
 const DIGIT_PATTERNS = [
     // 0
     [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,0,0,0,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
@@ -19,13 +19,12 @@ const DIGIT_PATTERNS = [
     // 8
     [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
     // 9
-    [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,1,1,1,0]],
+    [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,1,1,1,0]]
 ];
 
 const DIGIT_WIDTH = 5;
 const DIGIT_HEIGHT = 9;
 const DIGIT_SPACING = 2;
-const COUNTER_COLS = 20;
 const COUNTER_ROWS = 11;
 
 class YearDotsApp {
@@ -33,7 +32,6 @@ class YearDotsApp {
         this.year = 2026;
         this.today = new Date();
         this.storageKey = 'yearDots2026';
-
         this.init();
     }
 
@@ -62,7 +60,7 @@ class YearDotsApp {
     }
 
     loadData() {
-        const stored = localStorage.getItem(this.storageKey);
+        var stored = localStorage.getItem(this.storageKey);
         this.clickedDays = new Set(stored ? JSON.parse(stored) : []);
     }
 
@@ -71,14 +69,14 @@ class YearDotsApp {
     }
 
     getDayOfYear(date) {
-        const start = new Date(date.getFullYear(), 0, 0);
-        const diff = date - start;
-        const oneDay = 1000 * 60 * 60 * 24;
+        var start = new Date(date.getFullYear(), 0, 0);
+        var diff = date - start;
+        var oneDay = 1000 * 60 * 60 * 24;
         return Math.floor(diff / oneDay);
     }
 
     getDateFromDayNumber(dayNumber) {
-        const date = new Date(this.year, 0);
+        var date = new Date(this.year, 0);
         date.setDate(dayNumber);
         return date;
     }
@@ -92,17 +90,23 @@ class YearDotsApp {
     }
 
     formatDate(date) {
-        const options = { weekday: 'long', month: 'long', day: 'numeric' };
-        return date.toLocaleDateString('en-US', options);
+        return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
     }
 
     getDateKey(date) {
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    }
+
+    getCounterCols() {
+        var w = window.innerWidth;
+        if (w <= 400) return 18;
+        if (w >= 600) return 24;
+        return 20;
     }
 
     toggleDay(dayNumber, dotElement) {
-        const date = this.getDateFromDayNumber(dayNumber);
-        const dateKey = this.getDateKey(date);
+        var date = this.getDateFromDayNumber(dayNumber);
+        var dateKey = this.getDateKey(date);
 
         if (this.clickedDays.has(dateKey)) {
             this.clickedDays.delete(dateKey);
@@ -117,131 +121,149 @@ class YearDotsApp {
     }
 
     renderDots() {
-        const container = document.getElementById('dots-container');
-        const totalDays = this.getDaysInYear();
-        const todayNumber = this.today.getFullYear() === this.year ? this.getDayOfYear(this.today) : -1;
+        var container = document.getElementById('dots-container');
+        if (!container) return;
+        var totalDays = this.getDaysInYear();
+        var todayNumber = this.today.getFullYear() === this.year ? this.getDayOfYear(this.today) : -1;
 
         container.innerHTML = '';
 
-        for (let day = 1; day <= totalDays; day++) {
-            const dot = document.createElement('div');
+        for (var day = 1; day <= totalDays; day++) {
+            var dot = document.createElement('div');
             dot.className = 'dot';
-            dot.dataset.day = day;
+            dot.setAttribute('data-day', day);
 
-            const date = this.getDateFromDayNumber(day);
-            const dateKey = this.getDateKey(date);
+            var date = this.getDateFromDayNumber(day);
+            var dateKey = this.getDateKey(date);
 
             if (day === todayNumber) {
-                dot.classList.add('today', 'breathing');
+                dot.className += ' today breathing';
             } else if (day < todayNumber || (this.today.getFullYear() > this.year)) {
-                dot.classList.add('past');
+                dot.className += ' past';
             } else {
-                dot.classList.add('future');
+                dot.className += ' future';
             }
 
             if (this.clickedDays.has(dateKey)) {
-                dot.classList.add('clicked');
+                dot.className += ' clicked';
             }
 
             container.appendChild(dot);
         }
     }
 
-    // Build a grid bitmap for the counter number
-    buildCounterGrid(number) {
-        const grid = Array.from({ length: COUNTER_ROWS }, () => Array(COUNTER_COLS).fill(0));
-        const digits = String(number).split('').map(Number);
-        const totalWidth = digits.length * DIGIT_WIDTH + (digits.length - 1) * DIGIT_SPACING;
-        const offsetX = Math.floor((COUNTER_COLS - totalWidth) / 2);
-        const offsetY = Math.floor((COUNTER_ROWS - DIGIT_HEIGHT) / 2);
+    buildCounterGrid(number, cols) {
+        var grid = [];
+        var r, c;
+        for (r = 0; r < COUNTER_ROWS; r++) {
+            grid[r] = [];
+            for (c = 0; c < cols; c++) {
+                grid[r][c] = 0;
+            }
+        }
 
-        digits.forEach((digit, i) => {
-            const dx = offsetX + i * (DIGIT_WIDTH + DIGIT_SPACING);
-            const pattern = DIGIT_PATTERNS[digit];
-            for (let row = 0; row < DIGIT_HEIGHT; row++) {
-                for (let col = 0; col < DIGIT_WIDTH; col++) {
-                    const gx = dx + col;
-                    const gy = offsetY + row;
-                    if (gx >= 0 && gx < COUNTER_COLS && gy >= 0 && gy < COUNTER_ROWS) {
-                        grid[gy][gx] = pattern[row][col];
+        var digits = String(number).split('');
+        var totalWidth = digits.length * DIGIT_WIDTH + (digits.length - 1) * DIGIT_SPACING;
+        var offsetX = Math.floor((cols - totalWidth) / 2);
+        var offsetY = Math.floor((COUNTER_ROWS - DIGIT_HEIGHT) / 2);
+
+        for (var i = 0; i < digits.length; i++) {
+            var digit = parseInt(digits[i]);
+            var dx = offsetX + i * (DIGIT_WIDTH + DIGIT_SPACING);
+            var pattern = DIGIT_PATTERNS[digit];
+            for (r = 0; r < DIGIT_HEIGHT; r++) {
+                for (c = 0; c < DIGIT_WIDTH; c++) {
+                    var gx = dx + c;
+                    var gy = offsetY + r;
+                    if (gx >= 0 && gx < cols && gy >= 0 && gy < COUNTER_ROWS) {
+                        grid[gy][gx] = pattern[r][c];
                     }
                 }
             }
-        });
+        }
 
         return grid;
     }
 
     renderCounter() {
-        const container = document.getElementById('counter-display');
-        const count = this.clickedDays.size;
-        const grid = this.buildCounterGrid(count);
+        var container = document.getElementById('counter-display');
+        if (!container) return;
+        var cols = this.getCounterCols();
+        var count = this.clickedDays.size;
+        var grid = this.buildCounterGrid(count, cols);
 
+        container.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
         container.innerHTML = '';
 
-        for (let row = 0; row < COUNTER_ROWS; row++) {
-            for (let col = 0; col < COUNTER_COLS; col++) {
-                const dot = document.createElement('div');
-                dot.className = 'counter-dot';
-                if (grid[row][col]) {
-                    dot.classList.add('on');
-                }
+        for (var row = 0; row < COUNTER_ROWS; row++) {
+            for (var col = 0; col < cols; col++) {
+                var dot = document.createElement('div');
+                dot.className = grid[row][col] ? 'counter-dot on' : 'counter-dot';
                 container.appendChild(dot);
             }
         }
     }
 
     setupEventListeners() {
-        const container = document.getElementById('dots-container');
-        const tooltip = document.getElementById('tooltip');
-        const themeToggle = document.getElementById('theme-toggle');
+        var self = this;
+        var container = document.getElementById('dots-container');
+        var tooltip = document.getElementById('tooltip');
+        var themeToggle = document.getElementById('theme-toggle');
 
-        themeToggle.addEventListener('click', () => {
-            this.toggleTheme();
-        });
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function() {
+                self.toggleTheme();
+            });
+        }
 
-        container.addEventListener('click', (e) => {
+        if (!container) return;
+
+        container.addEventListener('click', function(e) {
             if (e.target.classList.contains('dot')) {
-                const dayNumber = parseInt(e.target.dataset.day);
-                this.toggleDay(dayNumber, e.target);
+                var dayNumber = parseInt(e.target.getAttribute('data-day'));
+                self.toggleDay(dayNumber, e.target);
             }
         });
 
-        container.addEventListener('mouseover', (e) => {
+        container.addEventListener('mouseover', function(e) {
             if (e.target.classList.contains('dot')) {
-                const dayNumber = parseInt(e.target.dataset.day);
-                const date = this.getDateFromDayNumber(dayNumber);
-                tooltip.textContent = this.formatDate(date);
+                var dayNumber = parseInt(e.target.getAttribute('data-day'));
+                var date = self.getDateFromDayNumber(dayNumber);
+                tooltip.textContent = self.formatDate(date);
                 tooltip.classList.add('visible');
             }
         });
 
-        container.addEventListener('mousemove', (e) => {
+        container.addEventListener('mousemove', function(e) {
             if (tooltip.classList.contains('visible')) {
                 tooltip.style.left = e.pageX + 10 + 'px';
                 tooltip.style.top = e.pageY - 30 + 'px';
             }
         });
 
-        container.addEventListener('mouseout', (e) => {
+        container.addEventListener('mouseout', function(e) {
             if (e.target.classList.contains('dot')) {
                 tooltip.classList.remove('visible');
             }
         });
+
+        window.addEventListener('resize', function() {
+            self.renderCounter();
+        });
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     new YearDotsApp();
 });
 
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
+    window.addEventListener('load', function() {
         navigator.serviceWorker.register('./sw.js')
-            .then((registration) => {
+            .then(function(registration) {
                 console.log('SW registered:', registration.scope);
             })
-            .catch((error) => {
+            .catch(function(error) {
                 console.log('SW registration failed:', error);
             });
     });
