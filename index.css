@@ -128,6 +128,15 @@ body {
     gap: 0.3rem;
 }
 
+.days-left {
+    font-size: 0.58rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
 .progress {
     width: min(240px, 62vw);
     height: 4px;

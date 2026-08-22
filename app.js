@@ -34,6 +34,7 @@ class YearDots {
             progress: document.getElementById('progress-fill'),
             stage: document.getElementById('stage'),
             dots: document.getElementById('dots'),
+            daysLeft: document.getElementById('days-left'),
             readout: document.getElementById('readout'),
             themeToggle: document.getElementById('theme-toggle'),
             themeColor: document.getElementById('theme-color')
@@ -54,6 +55,7 @@ class YearDots {
         this.el.goal.textContent = CONFIG.goal;
         this.el.dots.setAttribute('aria-label', 'Days of ' + this.year);
         this.buildDots();
+        this.updateDaysLeft();
         this.layout();
         this.updateScore(false);
         this.bindEvents();
@@ -183,15 +185,19 @@ class YearDots {
             .sort((a, b) => a.cost - b.cost)[0];
     }
 
-    // Space for the grid is whatever the stage has left once the score is placed.
+    // Space for the grid is whatever the stage has left once everything else
+    // on it - the score, the days-left line - has been placed.
     availableSpace() {
         const stage = this.el.stage;
         const styles = getComputedStyle(stage);
         const inset = (side) => parseFloat(styles['padding' + side]) || 0;
+        const gap = parseFloat(styles.rowGap) || 0;
+        const siblings = [...stage.children].filter((child) => child !== this.el.dots);
+        const taken = siblings.reduce((total, child) => total + child.offsetHeight, 0);
+
         return {
             width: stage.clientWidth - inset('Left') - inset('Right'),
-            height: stage.clientHeight - inset('Top') - inset('Bottom') -
-                this.el.scoreBlock.offsetHeight - (parseFloat(styles.rowGap) || 0)
+            height: stage.clientHeight - inset('Top') - inset('Bottom') - taken - gap * siblings.length
         };
     }
 
@@ -214,6 +220,12 @@ class YearDots {
         this.el.dots.style.setProperty('--gap', (dot * CONFIG.gapRatio).toFixed(2) + 'px');
         this.el.dots.style.gridTemplateColumns = 'repeat(' + best.cols + ', var(--dot))';
         this.centreLastRow(best.cols, days);
+    }
+
+    // Days still to come this year, today included - it can still be marked.
+    updateDaysLeft() {
+        const left = this.daysInYear() - this.dayOfYear(this.today) + 1;
+        this.el.daysLeft.textContent = left + (left === 1 ? ' day left' : ' days left');
     }
 
     updateScore(animate) {
@@ -315,6 +327,7 @@ class YearDots {
         }
 
         this.buildDots();
+        this.updateDaysLeft();
         this.invalidateLayout();
         this.layout();
         this.updateScore(false);
