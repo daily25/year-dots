@@ -1,5 +1,5 @@
 // Year Dots Service Worker
-const CACHE_NAME = 'year-dots-v3';
+const CACHE_NAME = 'year-dots-v4';
 const BASE_PATH = self.location.pathname.replace(/sw\.js$/, '');
 const urlsToCache = [
     BASE_PATH,
