@@ -1,12 +1,12 @@
 {
   "name": "Year Dots",
   "short_name": "Year Dots",
-  "description": "Your year at a glance - track daily selfies, mood, fitness, and reflections",
+  "description": "One dot per day. Tap a day to mark it and watch your year fill in.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0a0a0f",
-  "theme_color": "#6366f1",
+  "theme_color": "#0a0a0f",
   "orientation": "portrait",
   "icons": [
     {

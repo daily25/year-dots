@@ -3,54 +3,57 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Year Dots - Your Year at a Glance</title>
-    <meta name="description"
-        content="Visualize your year with 365 dots. Track your days, one dot at a time.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <title>Year Dots</title>
+    <meta name="description" content="One dot per day. Tap a day to mark it and watch your year fill in.">
+    <meta name="color-scheme" content="dark light">
 
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#6366f1">
+    <meta id="theme-color" name="theme-color" content="#0a0a0f">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="index.css">
 </head>
 
 <body>
-    <div id="app">
-        <div id="grid-view" class="view active">
-            <header class="header">
-                <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
-                    <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2">
-                        <circle cx="12" cy="12" r="5" />
-                        <path
-                            d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                    </svg>
-                    <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                    </svg>
-                </button>
-                <h1>2026</h1>
-            </header>
-            <div id="dots-container" class="dots-grid"></div>
-            <div id="counter-display" class="counter-grid"></div>
-            <div class="legend">
-                <span class="legend-item"><span class="legend-dot past"></span>Past</span>
-                <span class="legend-item"><span class="legend-dot today breathing"></span>Today</span>
-                <span class="legend-item"><span class="legend-dot future"></span>Future</span>
-                <span class="legend-item"><span class="legend-dot clicked"></span>Clicked</span>
-            </div>
-        </div>
-    </div>
+    <main class="app">
+        <header class="topbar">
+            <span id="year" class="year">2026</span>
+            <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">
+                <svg class="sun-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="4.5" />
+                    <path
+                        d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
+                <svg class="moon-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+            </button>
+        </header>
 
-    <div id="tooltip" class="tooltip"></div>
+        <div id="stage" class="stage">
+            <section id="score" class="score">
+                <div id="score-value" class="score-value" aria-live="polite">0</div>
+                <div class="score-label">days marked</div>
+                <div class="progress" role="presentation">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+            </section>
+
+            <div id="dots" class="dots" role="group" aria-label="Days of the year"></div>
+        </div>
+    </main>
+
+    <div id="readout" class="readout" aria-hidden="true"></div>
 
     <script src="app.js"></script>
 </body>

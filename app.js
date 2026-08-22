@@ -1,270 +1,343 @@
-// Digital clock digit patterns (5 wide x 9 tall, 7-segment style)
-const DIGIT_PATTERNS = [
-    // 0
-    [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,0,0,0,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
-    // 1
-    [[0,0,0,0,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,0]],
-    // 2
-    [[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[0,1,1,1,0]],
-    // 3
-    [[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,1,1,1,0]],
-    // 4
-    [[0,0,0,0,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,0]],
-    // 5
-    [[0,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,1,1,1,0]],
-    // 6
-    [[0,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
-    // 7
-    [[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,0]],
-    // 8
-    [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
-    // 9
-    [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,1,1,1,0]]
-];
+// Year Dots — one dot per day, tap to mark it.
 
-const DIGIT_WIDTH = 5;
-const DIGIT_HEIGHT = 9;
-const DIGIT_SPACING = 2;
-const COUNTER_ROWS = 11;
+const CONFIG = {
+    gapRatio: 0.34,     // gap size relative to dot size
+    maxDot: 18,         // px, keeps dots from ballooning on big screens
+    minDot: 3.5,
+    minCols: 8,
+    maxCols: 42,
+    sizeTolerance: 0.35, // px of dot size worth trading for a tidier grid
+    minAspect: 0.7,      // keep the block from getting too tall...
+    maxAspect: 1.9,      // ...or too wide, whatever shape the screen is
+    raggedWeight: 0.8,   // how much a half-empty last row costs
+    readoutMs: 1600
+};
 
-class YearDotsApp {
+class YearDots {
     constructor() {
-        this.year = 2026;
         this.today = new Date();
-        this.storageKey = 'yearDots2026';
-        this.init();
+        this.year = this.today.getFullYear();
+        this.storageKey = 'yearDots' + this.year;
+        this.dateFormat = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        this.marked = new Set();
+        this.readoutTimer = null;
+        this.measured = { w: 0, h: 0, days: 0 };
     }
 
     init() {
+        this.el = {
+            year: document.getElementById('year'),
+            score: document.getElementById('score-value'),
+            progress: document.getElementById('progress-fill'),
+            stage: document.getElementById('stage'),
+            scoreBlock: document.getElementById('score'),
+            dots: document.getElementById('dots'),
+            readout: document.getElementById('readout'),
+            themeToggle: document.getElementById('theme-toggle'),
+            themeColor: document.getElementById('theme-color')
+        };
+
+        this.applyTheme(this.storedTheme());
         this.loadData();
-        this.loadTheme();
-        this.renderDots();
-        this.renderCounter();
-        this.setupEventListeners();
+        this.el.year.textContent = this.year;
+        this.el.dots.setAttribute('aria-label', 'Days of ' + this.year);
+        this.buildDots();
+        this.layout();
+        this.updateScore(false);
+        this.bindEvents();
     }
 
-    loadTheme() {
-        const savedTheme = localStorage.getItem('yearDotsTheme') || 'dark';
-        document.body.setAttribute('data-theme', savedTheme);
-    }
-
-    saveTheme(theme) {
-        localStorage.setItem('yearDotsTheme', theme);
-    }
-
-    toggleTheme() {
-        const currentTheme = document.body.getAttribute('data-theme') || 'dark';
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        document.body.setAttribute('data-theme', newTheme);
-        this.saveTheme(newTheme);
-    }
+    /* ---------- data ---------- */
 
     loadData() {
-        var stored = localStorage.getItem(this.storageKey);
-        this.clickedDays = new Set(stored ? JSON.parse(stored) : []);
+        let days = [];
+        try {
+            const stored = localStorage.getItem(this.storageKey);
+            if (stored) days = JSON.parse(stored);
+        } catch (e) {
+            days = []; // unreadable or corrupt storage — carry on with an empty year
+        }
+        this.marked = new Set(Array.isArray(days) ? days : []);
     }
 
     saveData() {
-        localStorage.setItem(this.storageKey, JSON.stringify([...this.clickedDays]));
+        try {
+            localStorage.setItem(this.storageKey, JSON.stringify([...this.marked]));
+        } catch (e) {
+            /* storage unavailable (private mode) — the UI still works for this session */
+        }
     }
 
-    getDayOfYear(date) {
-        var start = new Date(date.getFullYear(), 0, 0);
-        var diff = date - start;
-        var oneDay = 1000 * 60 * 60 * 24;
-        return Math.floor(diff / oneDay);
-    }
-
-    getDateFromDayNumber(dayNumber) {
-        var date = new Date(this.year, 0);
-        date.setDate(dayNumber);
-        return date;
-    }
+    /* ---------- dates ---------- */
 
     isLeapYear(year) {
         return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
     }
 
-    getDaysInYear() {
+    daysInYear() {
         return this.isLeapYear(this.year) ? 366 : 365;
     }
 
-    formatDate(date) {
-        return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    dayOfYear(date) {
+        const start = new Date(date.getFullYear(), 0, 0);
+        return Math.floor((date - start) / 86400000);
     }
 
-    getDateKey(date) {
-        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    dateForDay(dayNumber) {
+        const date = new Date(this.year, 0);
+        date.setDate(dayNumber);
+        return date;
     }
 
-    getCounterCols() {
-        var w = window.innerWidth;
-        if (w <= 400) return 18;
-        if (w >= 600) return 24;
-        return 20;
+    dateKey(date) {
+        return date.getFullYear() + '-' +
+            String(date.getMonth() + 1).padStart(2, '0') + '-' +
+            String(date.getDate()).padStart(2, '0');
     }
 
-    toggleDay(dayNumber, dotElement) {
-        var date = this.getDateFromDayNumber(dayNumber);
-        var dateKey = this.getDateKey(date);
+    /* ---------- rendering ---------- */
 
-        if (this.clickedDays.has(dateKey)) {
-            this.clickedDays.delete(dateKey);
-            dotElement.classList.remove('clicked');
-        } else {
-            this.clickedDays.add(dateKey);
-            dotElement.classList.add('clicked');
-        }
+    buildDots() {
+        const total = this.daysInYear();
+        const todayNumber = this.dayOfYear(this.today);
+        const fragment = document.createDocumentFragment();
 
-        this.saveData();
-        this.renderCounter();
-    }
+        for (let day = 1; day <= total; day++) {
+            const date = this.dateForDay(day);
+            const key = this.dateKey(date);
+            const dot = document.createElement('div');
 
-    renderDots() {
-        var container = document.getElementById('dots-container');
-        if (!container) return;
-        var totalDays = this.getDaysInYear();
-        var todayNumber = this.today.getFullYear() === this.year ? this.getDayOfYear(this.today) : -1;
-
-        container.innerHTML = '';
-
-        for (var day = 1; day <= totalDays; day++) {
-            var dot = document.createElement('div');
-            dot.className = 'dot';
-            dot.setAttribute('data-day', day);
-
-            var date = this.getDateFromDayNumber(day);
-            var dateKey = this.getDateKey(date);
-
+            let className = 'dot';
             if (day === todayNumber) {
-                dot.className += ' today breathing';
-            } else if (day < todayNumber || (this.today.getFullYear() > this.year)) {
-                dot.className += ' past';
-            } else {
-                dot.className += ' future';
+                className += ' today';
+            } else if (day < todayNumber) {
+                className += ' past';
+            }
+            if (this.marked.has(key)) {
+                className += ' marked';
             }
 
-            if (this.clickedDays.has(dateKey)) {
-                dot.className += ' clicked';
-            }
+            dot.className = className;
+            dot.dataset.key = key;
+            dot.setAttribute('role', 'checkbox');
+            dot.setAttribute('aria-label', this.dateFormat.format(date));
+            dot.setAttribute('aria-checked', this.marked.has(key) ? 'true' : 'false');
+            fragment.appendChild(dot);
+        }
 
-            container.appendChild(dot);
+        this.el.dots.textContent = '';
+        this.el.dots.appendChild(fragment);
+    }
+
+    // Pick the column count that makes the dots as large as possible in the
+    // space available, then break ties towards a well-proportioned block with
+    // a last row that isn't left mostly empty.
+    pickLayout(width, height, count) {
+        const target = Math.min(CONFIG.maxAspect, Math.max(CONFIG.minAspect, width / height));
+        const options = [];
+
+        for (let cols = CONFIG.minCols; cols <= CONFIG.maxCols; cols++) {
+            const rows = Math.ceil(count / cols);
+            const cell = Math.min(width / cols, height / rows);
+            const dot = Math.min(cell / (1 + CONFIG.gapRatio), CONFIG.maxDot);
+            const lastRow = count - (rows - 1) * cols;
+            const cost = Math.abs(Math.log((cols / rows) / target)) +
+                CONFIG.raggedWeight * ((cols - lastRow) / cols);
+            options.push({ cols, dot, cost });
+        }
+
+        const largest = options.reduce((max, option) => Math.max(max, option.dot), 0);
+        return options
+            .filter((option) => option.dot >= largest - CONFIG.sizeTolerance)
+            .sort((a, b) => a.cost - b.cost)[0];
+    }
+
+    // Space for the grid is whatever the stage has left once the score is placed.
+    availableSpace() {
+        const stage = this.el.stage;
+        const styles = getComputedStyle(stage);
+        const inset = (side) => parseFloat(styles['padding' + side]) || 0;
+        return {
+            width: stage.clientWidth - inset('Left') - inset('Right'),
+            height: stage.clientHeight - inset('Top') - inset('Bottom') -
+                this.el.scoreBlock.offsetHeight - (parseFloat(styles.rowGap) || 0)
+        };
+    }
+
+    // Force the next layout() to recompute even if the stage is the same size.
+    invalidateLayout() {
+        this.measured = { w: 0, h: 0, days: 0 };
+    }
+
+    layout() {
+        const { width, height } = this.availableSpace();
+        const days = this.daysInYear();
+        if (width <= 0 || height <= 0) return;
+        if (width === this.measured.w && height === this.measured.h && days === this.measured.days) return;
+        this.measured = { w: width, h: height, days: days };
+
+        const best = this.pickLayout(width, height, days);
+        const dot = Math.max(CONFIG.minDot, best.dot);
+
+        this.el.dots.style.setProperty('--dot', dot.toFixed(2) + 'px');
+        this.el.dots.style.setProperty('--gap', (dot * CONFIG.gapRatio).toFixed(2) + 'px');
+        this.el.dots.style.gridTemplateColumns = 'repeat(' + best.cols + ', var(--dot))';
+    }
+
+    updateScore(animate) {
+        const count = this.marked.size;
+        this.el.score.textContent = count;
+        this.el.progress.style.transform = 'scaleX(' + (count / this.daysInYear()) + ')';
+
+        if (animate) {
+            this.el.score.classList.remove('pop');
+            void this.el.score.offsetWidth; // restart the animation
+            this.el.score.classList.add('pop');
         }
     }
 
-    buildCounterGrid(number, cols) {
-        var grid = [];
-        var r, c;
-        for (r = 0; r < COUNTER_ROWS; r++) {
-            grid[r] = [];
-            for (c = 0; c < cols; c++) {
-                grid[r][c] = 0;
-            }
+    /* ---------- interaction ---------- */
+
+    toggleDay(dot) {
+        const key = dot.dataset.key;
+        const marking = !this.marked.has(key);
+
+        if (marking) {
+            this.marked.add(key);
+            dot.classList.add('marked', 'bump');
+            dot.addEventListener('animationend', () => dot.classList.remove('bump'), { once: true });
+        } else {
+            this.marked.delete(key);
+            dot.classList.remove('marked');
         }
 
-        var digits = String(number).split('');
-        var totalWidth = digits.length * DIGIT_WIDTH + (digits.length - 1) * DIGIT_SPACING;
-        var offsetX = Math.floor((cols - totalWidth) / 2);
-        var offsetY = Math.floor((COUNTER_ROWS - DIGIT_HEIGHT) / 2);
+        dot.setAttribute('aria-checked', marking ? 'true' : 'false');
+        this.saveData();
+        this.updateScore(true);
+        this.showReadout(dot.getAttribute('aria-label'), true);
 
-        for (var i = 0; i < digits.length; i++) {
-            var digit = parseInt(digits[i]);
-            var dx = offsetX + i * (DIGIT_WIDTH + DIGIT_SPACING);
-            var pattern = DIGIT_PATTERNS[digit];
-            for (r = 0; r < DIGIT_HEIGHT; r++) {
-                for (c = 0; c < DIGIT_WIDTH; c++) {
-                    var gx = dx + c;
-                    var gy = offsetY + r;
-                    if (gx >= 0 && gx < cols && gy >= 0 && gy < COUNTER_ROWS) {
-                        grid[gy][gx] = pattern[r][c];
-                    }
-                }
-            }
-        }
-
-        return grid;
+        if (marking && navigator.vibrate) navigator.vibrate(8);
     }
 
-    renderCounter() {
-        var container = document.getElementById('counter-display');
-        if (!container) return;
-        var cols = this.getCounterCols();
-        var count = this.clickedDays.size;
-        var grid = this.buildCounterGrid(count, cols);
-
-        container.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
-        container.innerHTML = '';
-
-        for (var row = 0; row < COUNTER_ROWS; row++) {
-            for (var col = 0; col < cols; col++) {
-                var dot = document.createElement('div');
-                dot.className = grid[row][col] ? 'counter-dot on' : 'counter-dot';
-                container.appendChild(dot);
-            }
+    showReadout(text, autoHide) {
+        clearTimeout(this.readoutTimer);
+        this.el.readout.textContent = text;
+        this.el.readout.classList.add('visible');
+        if (autoHide) {
+            this.readoutTimer = setTimeout(() => this.hideReadout(), CONFIG.readoutMs);
         }
     }
 
-    setupEventListeners() {
-        var self = this;
-        var container = document.getElementById('dots-container');
-        var tooltip = document.getElementById('tooltip');
-        var themeToggle = document.getElementById('theme-toggle');
+    hideReadout() {
+        clearTimeout(this.readoutTimer);
+        this.el.readout.classList.remove('visible');
+    }
 
-        if (themeToggle) {
-            themeToggle.addEventListener('click', function() {
-                self.toggleTheme();
+    /* ---------- theme ---------- */
+
+    storedTheme() {
+        let saved = null;
+        try {
+            saved = localStorage.getItem('yearDotsTheme');
+        } catch (e) {
+            saved = null;
+        }
+        if (saved) return saved;
+        return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+
+    applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.style.colorScheme = theme;
+        this.el.themeColor.setAttribute('content', theme === 'light' ? '#fbfbfd' : '#0a0a0f');
+        try {
+            localStorage.setItem('yearDotsTheme', theme);
+        } catch (e) {
+            /* ignore */
+        }
+    }
+
+    toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme');
+        this.applyTheme(current === 'light' ? 'dark' : 'light');
+    }
+
+    /* ---------- date rollover ---------- */
+
+    refreshIfDateChanged() {
+        const now = new Date();
+        if (this.dateKey(now) === this.dateKey(this.today)) return;
+
+        const yearChanged = now.getFullYear() !== this.year;
+        this.today = now;
+
+        if (yearChanged) {
+            this.year = now.getFullYear();
+            this.storageKey = 'yearDots' + this.year;
+            this.loadData();
+            this.el.year.textContent = this.year;
+            this.el.dots.setAttribute('aria-label', 'Days of ' + this.year);
+        }
+
+        this.buildDots();
+        this.invalidateLayout();
+        this.layout();
+        this.updateScore(false);
+    }
+
+    /* ---------- events ---------- */
+
+    bindEvents() {
+        const dots = this.el.dots;
+
+        dots.addEventListener('click', (e) => {
+            const dot = e.target.closest('.dot');
+            if (dot) this.toggleDay(dot);
+        });
+
+        if (window.matchMedia('(hover: hover)').matches) {
+            dots.addEventListener('mouseover', (e) => {
+                const dot = e.target.closest('.dot');
+                if (dot) this.showReadout(dot.getAttribute('aria-label'), false);
+            });
+            dots.addEventListener('mouseleave', () => this.hideReadout());
+        }
+
+        this.el.themeToggle.addEventListener('click', () => this.toggleTheme());
+
+        if (window.ResizeObserver) {
+            let frame = null;
+            const observer = new ResizeObserver(() => {
+                cancelAnimationFrame(frame);
+                frame = requestAnimationFrame(() => this.layout());
+            });
+            observer.observe(this.el.stage);
+        } else {
+            window.addEventListener('resize', () => this.layout());
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) this.refreshIfDateChanged();
+        });
+
+        // The score block changes height when the web font swaps in.
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+                this.invalidateLayout();
+                this.layout();
             });
         }
-
-        if (!container) return;
-
-        container.addEventListener('click', function(e) {
-            if (e.target.classList.contains('dot')) {
-                var dayNumber = parseInt(e.target.getAttribute('data-day'));
-                self.toggleDay(dayNumber, e.target);
-            }
-        });
-
-        container.addEventListener('mouseover', function(e) {
-            if (e.target.classList.contains('dot')) {
-                var dayNumber = parseInt(e.target.getAttribute('data-day'));
-                var date = self.getDateFromDayNumber(dayNumber);
-                tooltip.textContent = self.formatDate(date);
-                tooltip.classList.add('visible');
-            }
-        });
-
-        container.addEventListener('mousemove', function(e) {
-            if (tooltip.classList.contains('visible')) {
-                tooltip.style.left = e.pageX + 10 + 'px';
-                tooltip.style.top = e.pageY - 30 + 'px';
-            }
-        });
-
-        container.addEventListener('mouseout', function(e) {
-            if (e.target.classList.contains('dot')) {
-                tooltip.classList.remove('visible');
-            }
-        });
-
-        window.addEventListener('resize', function() {
-            self.renderCounter();
-        });
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    new YearDotsApp();
+document.addEventListener('DOMContentLoaded', () => {
+    new YearDots().init();
 });
 
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-        navigator.serviceWorker.register('./sw.js')
-            .then(function(registration) {
-                console.log('SW registered:', registration.scope);
-            })
-            .catch(function(error) {
-                console.log('SW registration failed:', error);
-            });
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {
+            /* offline support is optional */
+        });
     });
 }
