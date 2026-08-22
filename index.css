@@ -64,7 +64,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.4rem 0.75rem 0;
+    padding: 0.3rem 0.75rem 0;
     flex-shrink: 0;
 }
 
@@ -115,57 +115,44 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: clamp(0.5rem, 1.8vh, 1.1rem);
+    justify-content: flex-start;
+    gap: clamp(0.4rem, 1.2vh, 0.8rem);
     padding: 0 0.75rem 0.65rem;
 }
 
-/* Score: a ring filled to the share of the goal reached */
+/* Score: the count over its goal, with a bar filled to the share reached */
 .score {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: clamp(112px, 30vw, 148px);
-    aspect-ratio: 1;
-}
-
-.ring {
-    grid-area: 1 / 1;
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-}
-
-.ring-track,
-.ring-fill {
-    fill: none;
-    stroke-width: 4;
-}
-
-.ring-track {
-    stroke: var(--track);
-}
-
-.ring-fill {
-    stroke: var(--accent);
-    stroke-linecap: round;
-    transition: stroke-dashoffset 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.score.reached .ring-fill {
-    stroke: var(--accent-2);
-}
-
-.score-text {
-    grid-area: 1 / 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.15rem;
+    gap: 0.3rem;
+}
+
+.progress {
+    width: min(240px, 62vw);
+    height: 4px;
+    margin-top: 0.2rem;
+    border-radius: 999px;
+    background: var(--track);
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.score.reached .progress-fill {
+    background: var(--accent-2);
 }
 
 .score-value {
-    font-size: clamp(1.6rem, 6.5vw, 2.1rem);
+    font-size: clamp(2rem, 9vw, 2.6rem);
     font-weight: 600;
     line-height: 1;
     letter-spacing: -0.03em;
@@ -173,7 +160,7 @@ body {
 }
 
 .score-goal {
-    font-size: 0.5em;
+    font-size: 0.42em;
     font-weight: 500;
     color: var(--muted);
     letter-spacing: 0;
@@ -330,11 +317,15 @@ body {
     }
 
     .score {
-        width: clamp(84px, 22vh, 112px);
+        gap: 0.15rem;
     }
 
     .score-value {
-        font-size: 1.4rem;
+        font-size: 1.9rem;
+    }
+
+    .progress {
+        margin-top: 0.15rem;
     }
 }
 
