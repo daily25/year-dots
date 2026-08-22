@@ -1,22 +1,29 @@
 // Year Dots Service Worker
-const CACHE_NAME = 'year-dots-v4';
+const CACHE_NAME = 'year-dots-v5';
+// Keep in step with the ?v= stamps in index.html.
+const ASSET_VERSION = '2';
 const BASE_PATH = self.location.pathname.replace(/sw\.js$/, '');
 const urlsToCache = [
     BASE_PATH,
     BASE_PATH + 'index.html',
-    BASE_PATH + 'index.css',
-    BASE_PATH + 'app.js',
+    BASE_PATH + 'index.css?v=' + ASSET_VERSION,
+    BASE_PATH + 'app.js?v=' + ASSET_VERSION,
     BASE_PATH + 'manifest.json',
     BASE_PATH + 'icons/icon-192.png',
     BASE_PATH + 'icons/icon-512.png'
 ];
 
-// Install event - cache assets
+// Install event - cache assets, bypassing the HTTP cache so a stale copy
+// never gets baked into this version's cache.
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
-                return cache.addAll(urlsToCache);
+                return Promise.all(urlsToCache.map((url) => {
+                    return fetch(new Request(url, { cache: 'reload' }))
+                        .then((response) => response.ok ? cache.put(url, response) : null)
+                        .catch(() => null);
+                }));
             })
             .catch((err) => {
                 console.log('Cache failed:', err);

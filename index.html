@@ -19,7 +19,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="index.css">
+    <!-- ?v= is bumped with every change to these files: a browser holding a stale
+         copy of one asset can never pair it with a newer index.html. -->
+    <link rel="stylesheet" href="index.css?v=2">
 </head>
 
 <body>
@@ -42,10 +44,16 @@
 
         <div id="stage" class="stage">
             <section id="score" class="score">
-                <div id="score-value" class="score-value" aria-live="polite">0</div>
-                <div class="score-label">days marked</div>
-                <div class="progress" role="presentation">
-                    <div id="progress-fill" class="progress-fill"></div>
+                <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+                    <circle class="ring-track" cx="60" cy="60" r="54" />
+                    <circle id="ring-fill" class="ring-fill" cx="60" cy="60" r="54" />
+                </svg>
+                <div class="score-text">
+                    <div class="score-value" aria-live="polite">
+                        <span id="score-count" class="count">0</span><span class="score-goal">/<span
+                                id="score-goal">100</span></span>
+                    </div>
+                    <div class="score-label">days</div>
                 </div>
             </section>
 
@@ -55,7 +63,7 @@
 
     <div id="readout" class="readout" aria-hidden="true"></div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2"></script>
 </body>
 
 </html>
