@@ -1,8 +1,9 @@
 // Year Dots — one dot per day, tap to mark it.
 
 const CONFIG = {
-    gapRatio: 0.34,     // gap size relative to dot size
-    maxDot: 18,         // px, keeps dots from ballooning on big screens
+    goal: 100,          // days to aim for this year
+    gapRatio: 0.27,     // gap size relative to dot size
+    maxDot: 26,         // px, keeps dots from ballooning on big screens
     minDot: 3.5,
     minCols: 8,
     maxCols: 42,
@@ -27,19 +28,32 @@ class YearDots {
     init() {
         this.el = {
             year: document.getElementById('year'),
-            score: document.getElementById('score-value'),
-            progress: document.getElementById('progress-fill'),
-            stage: document.getElementById('stage'),
+            score: document.getElementById('score-count'),
+            goal: document.getElementById('score-goal'),
             scoreBlock: document.getElementById('score'),
+            ring: document.getElementById('ring-fill'),
+            stage: document.getElementById('stage'),
             dots: document.getElementById('dots'),
             readout: document.getElementById('readout'),
             themeToggle: document.getElementById('theme-toggle'),
             themeColor: document.getElementById('theme-color')
         };
 
+        // If the page and this script ever disagree about the markup — a browser
+        // serving one of them from a stale cache — say so instead of leaving a
+        // half-drawn screen behind.
+        const missing = Object.keys(this.el).filter((key) => !this.el[key]);
+        if (missing.length) {
+            console.error('Year Dots: markup is out of date, missing ' + missing.join(', '));
+            return;
+        }
+
         this.applyTheme(this.storedTheme());
         this.loadData();
         this.el.year.textContent = this.year;
+        this.el.goal.textContent = CONFIG.goal;
+        this.ringLength = 2 * Math.PI * this.el.ring.r.baseVal.value;
+        this.el.ring.style.strokeDasharray = this.ringLength;
         this.el.dots.setAttribute('aria-label', 'Days of ' + this.year);
         this.buildDots();
         this.layout();
@@ -186,8 +200,11 @@ class YearDots {
 
     updateScore(animate) {
         const count = this.marked.size;
+        const progress = Math.min(1, count / CONFIG.goal);
+
         this.el.score.textContent = count;
-        this.el.progress.style.transform = 'scaleX(' + (count / this.daysInYear()) + ')';
+        this.el.ring.style.strokeDashoffset = this.ringLength * (1 - progress);
+        this.el.scoreBlock.classList.toggle('reached', count >= CONFIG.goal);
 
         if (animate) {
             this.el.score.classList.remove('pop');
