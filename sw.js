@@ -1,7 +1,7 @@
 // Year Dots Service Worker
-const CACHE_NAME = 'year-dots-v5';
+const CACHE_NAME = 'year-dots-v6';
 // Keep in step with the ?v= stamps in index.html.
-const ASSET_VERSION = '2';
+const ASSET_VERSION = '3';
 const BASE_PATH = self.location.pathname.replace(/sw\.js$/, '');
 const urlsToCache = [
     BASE_PATH,
