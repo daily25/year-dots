@@ -3,7 +3,7 @@
 const CONFIG = {
     goal: 100,          // days to aim for this year
     gapRatio: 0.27,     // gap size relative to dot size
-    maxDot: 26,         // px, keeps dots from ballooning on big screens
+    maxDot: 30,         // px, keeps dots from ballooning on big screens
     minDot: 3.5,
     minCols: 8,
     maxCols: 42,
@@ -31,7 +31,7 @@ class YearDots {
             score: document.getElementById('score-count'),
             goal: document.getElementById('score-goal'),
             scoreBlock: document.getElementById('score'),
-            ring: document.getElementById('ring-fill'),
+            progress: document.getElementById('progress-fill'),
             stage: document.getElementById('stage'),
             dots: document.getElementById('dots'),
             readout: document.getElementById('readout'),
@@ -52,8 +52,6 @@ class YearDots {
         this.loadData();
         this.el.year.textContent = this.year;
         this.el.goal.textContent = CONFIG.goal;
-        this.ringLength = 2 * Math.PI * this.el.ring.r.baseVal.value;
-        this.el.ring.style.strokeDasharray = this.ringLength;
         this.el.dots.setAttribute('aria-label', 'Days of ' + this.year);
         this.buildDots();
         this.layout();
@@ -141,6 +139,25 @@ class YearDots {
 
         this.el.dots.textContent = '';
         this.el.dots.appendChild(fragment);
+        this.lastRowStart = null;
+    }
+
+    // The year rarely divides evenly into columns, so centre whatever is left
+    // over on the final row rather than letting it hang off to one side.
+    centreLastRow(cols, count) {
+        if (this.lastRowStart) {
+            this.lastRowStart.style.gridColumnStart = '';
+            this.lastRowStart = null;
+        }
+
+        const rows = Math.ceil(count / cols);
+        const inLastRow = count - (rows - 1) * cols;
+        if (inLastRow === cols) return;
+
+        const first = this.el.dots.children[(rows - 1) * cols];
+        if (!first) return;
+        first.style.gridColumnStart = Math.floor((cols - inLastRow) / 2) + 1;
+        this.lastRowStart = first;
     }
 
     // Pick the column count that makes the dots as large as possible in the
@@ -196,6 +213,7 @@ class YearDots {
         this.el.dots.style.setProperty('--dot', dot.toFixed(2) + 'px');
         this.el.dots.style.setProperty('--gap', (dot * CONFIG.gapRatio).toFixed(2) + 'px');
         this.el.dots.style.gridTemplateColumns = 'repeat(' + best.cols + ', var(--dot))';
+        this.centreLastRow(best.cols, days);
     }
 
     updateScore(animate) {
@@ -203,7 +221,7 @@ class YearDots {
         const progress = Math.min(1, count / CONFIG.goal);
 
         this.el.score.textContent = count;
-        this.el.ring.style.strokeDashoffset = this.ringLength * (1 - progress);
+        this.el.progress.style.transform = 'scaleX(' + progress + ')';
         this.el.scoreBlock.classList.toggle('reached', count >= CONFIG.goal);
 
         if (animate) {
