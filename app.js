@@ -1,5 +1,14 @@
 // Year Dots — one dot per day, tap to mark it.
 
+// Where marked days are stored so anything else can read them. The key is a
+// publishable one: it is meant to ship in the page, and row-level security
+// decides what it can do (read, insert, update - never delete).
+const SYNC = {
+    endpoint: 'https://urjvspdwwjulujljxphh.supabase.co/rest/v1/year_dots',
+    key: 'sb_publishable_Y1MTn4be6XF-WZjhgfIHkw_2MEzE53x',
+    debounceMs: 900
+};
+
 const CONFIG = {
     goal: 100,          // days to aim for this year
     gapRatio: 0.27,     // gap size relative to dot size
@@ -21,6 +30,10 @@ class YearDots {
         this.storageKey = 'yearDots' + this.year;
         this.dateFormat = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
         this.marked = new Set();
+        this.updatedAt = 0;      // when this device last changed the data
+        this.legacyLocal = false; // stored before syncing existed, so undated
+        this.pushTimer = null;
+        this.pushPending = false;
         this.readoutTimer = null;
         this.measured = { w: 0, h: 0, days: 0 };
     }
@@ -59,27 +72,144 @@ class YearDots {
         this.layout();
         this.updateScore(false);
         this.bindEvents();
+        this.syncOnLoad();
     }
 
     /* ---------- data ---------- */
 
     loadData() {
-        let days = [];
+        let stored = null;
         try {
-            const stored = localStorage.getItem(this.storageKey);
-            if (stored) days = JSON.parse(stored);
+            const raw = localStorage.getItem(this.storageKey);
+            if (raw) stored = JSON.parse(raw);
         } catch (e) {
-            days = []; // unreadable or corrupt storage — carry on with an empty year
+            stored = null; // unreadable or corrupt storage — carry on with an empty year
         }
-        this.marked = new Set(Array.isArray(days) ? days : []);
+
+        // Older versions stored a bare array of days with no timestamp.
+        if (Array.isArray(stored)) {
+            this.marked = new Set(stored);
+            this.updatedAt = 0;
+            this.legacyLocal = this.marked.size > 0;
+        } else if (stored && Array.isArray(stored.days)) {
+            this.marked = new Set(stored.days);
+            this.updatedAt = Date.parse(stored.updatedAt) || 0;
+            this.legacyLocal = false;
+        } else {
+            this.marked = new Set();
+            this.updatedAt = 0;
+            this.legacyLocal = false;
+        }
     }
 
     saveData() {
         try {
-            localStorage.setItem(this.storageKey, JSON.stringify([...this.marked]));
+            localStorage.setItem(this.storageKey, JSON.stringify({
+                days: this.sortedDays(),
+                updatedAt: new Date(this.updatedAt).toISOString()
+            }));
         } catch (e) {
             /* storage unavailable (private mode) — the UI still works for this session */
         }
+    }
+
+    sortedDays() {
+        return [...this.marked].sort();
+    }
+
+    /* ---------- sync ---------- */
+
+    // Remote is the shared copy; local storage stays the working copy so the
+    // screen never waits on the network and still works offline.
+    async pull() {
+        const url = SYNC.endpoint + '?select=days,updated_at&year=eq.' + this.year;
+        const response = await fetch(url, { headers: { apikey: SYNC.key } });
+        if (!response.ok) throw new Error('read failed: ' + response.status);
+
+        const rows = await response.json();
+        if (!rows.length) return null;
+        return {
+            days: Array.isArray(rows[0].days) ? rows[0].days : [],
+            updatedAt: Date.parse(rows[0].updated_at) || 0
+        };
+    }
+
+    async push() {
+        const response = await fetch(SYNC.endpoint, {
+            method: 'POST',
+            headers: {
+                apikey: SYNC.key,
+                'Content-Type': 'application/json',
+                Prefer: 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify([{
+                year: this.year,
+                days: this.sortedDays(),
+                updated_at: new Date(this.updatedAt || Date.now()).toISOString()
+            }])
+        });
+        if (!response.ok) throw new Error('write failed: ' + response.status);
+    }
+
+    async syncOnLoad() {
+        let remote;
+        try {
+            remote = await this.pull();
+        } catch (e) {
+            this.pushPending = this.marked.size > 0;
+            return; // offline or unreachable — local carries on unchanged
+        }
+
+        // Days saved before syncing existed carry no timestamp, so they can't be
+        // ordered against the remote copy. Union them rather than pick a winner:
+        // a first sync must never be able to drop days that only exist here.
+        if (this.legacyLocal) {
+            const before = this.marked.size;
+            if (remote) remote.days.forEach((day) => this.marked.add(day));
+            this.legacyLocal = false;
+            this.updatedAt = Date.now();
+            this.saveData();
+            if (this.marked.size !== before) this.redrawDays();
+            await this.trySave();
+            return;
+        }
+
+        if (!remote) {
+            if (this.marked.size) await this.trySave();
+            return;
+        }
+
+        if (remote.updatedAt > this.updatedAt) {
+            this.marked = new Set(remote.days);
+            this.updatedAt = remote.updatedAt;
+            this.saveData();
+            this.redrawDays();
+        } else if (this.updatedAt > remote.updatedAt) {
+            await this.trySave();
+        }
+    }
+
+    async trySave() {
+        try {
+            await this.push();
+            this.pushPending = false;
+        } catch (e) {
+            this.pushPending = true;
+            this.showReadout('offline — saved on this device', true);
+        }
+    }
+
+    queueSave() {
+        clearTimeout(this.pushTimer);
+        this.pushTimer = setTimeout(() => this.trySave(), SYNC.debounceMs);
+    }
+
+    // Repaint the grid after the marked days were replaced wholesale.
+    redrawDays() {
+        this.buildDots();
+        this.invalidateLayout();
+        this.layout();
+        this.updateScore(false);
     }
 
     /* ---------- dates ---------- */
@@ -259,7 +389,9 @@ class YearDots {
         }
 
         dot.setAttribute('aria-checked', marking ? 'true' : 'false');
+        this.updatedAt = Date.now();
         this.saveData();
+        this.queueSave();
         this.updateScore(true);
         this.showReadout(dot.getAttribute('aria-label'), true);
 
@@ -365,7 +497,9 @@ class YearDots {
         }
 
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) this.refreshIfDateChanged();
+            if (document.hidden) return;
+            this.refreshIfDateChanged();
+            if (this.pushPending) this.trySave(); else this.syncOnLoad();
         });
 
         // The score block changes height when the web font swaps in.
