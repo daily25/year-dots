@@ -1,7 +1,7 @@
 // Year Dots Service Worker
-const CACHE_NAME = 'year-dots-v8';
+const CACHE_NAME = 'year-dots-v9';
 // Keep in step with the ?v= stamps in index.html.
-const ASSET_VERSION = '5';
+const ASSET_VERSION = '6';
 const BASE_PATH = self.location.pathname.replace(/sw\.js$/, '');
 const urlsToCache = [
     BASE_PATH,
@@ -50,6 +50,10 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - network first, fall back to cache
 self.addEventListener('fetch', (event) => {
+    // Sync calls go straight to the network - a cached copy of the data would
+    // be worse than no copy at all.
+    if (event.request.url.includes('/rest/v1/')) return;
+
     event.respondWith(
         fetch(event.request)
             .then((response) => {
